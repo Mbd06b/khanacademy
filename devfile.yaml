@@ -1,0 +1,89 @@
+schemaVersion: 2.2.0
+metadata:
+  name: khan-devspace
+  displayName: Che Image and Workspace Development
+  description: >-
+    Universal Developer Image provides various programming languages tools and
+    runtimes for instant coding, plus ai utilities
+  icon: >-
+    https://raw.githubusercontent.com/devfile/devfile-web/main/apps/landing-page/public/pwa-192x192.png
+  tags:
+    - Java
+    - Maven
+    - Scala
+    - PHP
+    - .NET
+    - Node.js
+    - Go
+    - Python
+    - Pip
+    - ubi9
+    - Claude
+  projectType: universal
+  language: Polyglot
+  version: 1.0.0
+  projects:
+  - name: khanacademy
+    git:
+      remotes:
+        origin: https://github.com/Mbd06b/khanacademy.git
+components:
+  - name: tools
+    container:
+      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:latest
+      memoryLimit: 4G
+      memoryRequest: 1G
+      mountSources: true
+      env:
+        - name: CLAUDE_CONFIG_DIR
+          value: /tmp/claude-config
+        - name: NPM_CONFIG_CACHE
+          value: /tmp/npm-cache
+        - name: CYPRESS_CACHE_FOLDER
+          value: /tmp/cypress-cache
+        - name: JENKINS_URL
+          value: "https://jenkins.ethosengine.com"
+      endpoints:
+        - name: angular-dev
+          targetPort: 4200
+          exposure: public
+          protocol: http
+commands:
+  - id: setup-npm-env
+    exec:
+      component: tools
+      commandLine: |
+        echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
+        source ~/.bashrc
+
+  - id: setup-claude-mcp
+    exec:
+      component: tools
+      workingDir: /projects/khanacademy
+      commandLine: |
+        export STORAGE_PATH=/tmp/sonarqube-mcp-storage
+        mkdir -p "$STORAGE_PATH"
+        claude mcp remove sonarqube 2>/dev/null || true
+        claude mcp add sonarqube \
+          --env STORAGE_PATH="$STORAGE_PATH" \
+          --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
+          --env SONARQUBE_URL="$SONARQUBE_URL" \
+          -- java -jar /opt/mcp/sonarqube-mcp.jar
+        
+        claude mcp remove jenkins 2>/dev/null || true
+        
+        export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
+        
+        # Add Jenkins MCP server using HTTP transport,
+        # connection might fail if the jenkins user (token owner) does not have an active oidc session
+        claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
+          --transport http \
+          --header "Authorization: Basic $JENKINS_AUTH" \
+          --env JENKINS_URL="$JENKINS_URL" \
+          --env JENKINS_USERNAME="$JENKINS_USERNAME" \
+          --env JENKINS_TOKEN="$JENKINS_TOKEN"      
+           
+events:
+  postStart:
+    - setup-npm-env
+    - setup-claude-mcp
