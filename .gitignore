@@ -1,0 +1,55 @@
+# Python compiled files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Python package distribution
+*.egg-info/
+*.dist-info/
+
+# Google App Engine
+.gae_pythonpath_import.py
+
+# Development tools
+.claude/
+
+# Backup and temporary files
+*_original.py
+*_patch.py
+
+# Third-party libraries (should be managed via requirements)
+django/
+gdata/
+
+# Build and deployment artifacts
+bin/
+deploy/
+
+# Data loading logs and progress files
+sample_data/bulkloader-log-*
+sample_data/bulkloader-progress-*
+sample_data/*.sql3
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

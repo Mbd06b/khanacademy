@@ -9,7 +9,11 @@ from app import App
 import consts
 
 # get registry, we need it to register our filter later.
-register = webapp.template.create_template_register()
+try:
+    register = webapp.template.create_template_register()
+except:
+    # Fallback for Django compatibility
+    register = template.Library()
 
 def highlight(parser, token):
     try:

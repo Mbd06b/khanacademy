@@ -1,7 +1,12 @@
 from google.appengine.ext import webapp
+from django import template
 from django.template.defaultfilters import stringfilter
 
-register = webapp.template.create_template_register()
+try:
+    register = webapp.template.create_template_register()
+except:
+    # Fallback for Django compatibility
+    register = template.Library()
 
 # ------------------------------------------------------------------------------
 # Code copied from more recent Django than App Engine defaults to; if using

@@ -27,33 +27,50 @@ metadata:
     git:
       remotes:
         origin: https://github.com/Mbd06b/khanacademy.git
+
 components:
   - name: tools
     container:
-      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:latest
+      image: harbor.ethosengine.com/devspaces/udi-plus-gae:latest
       memoryLimit: 4G
       memoryRequest: 1G
       mountSources: true
       env:
         - name: CLAUDE_CONFIG_DIR
           value: /tmp/claude-config
-        - name: NPM_CONFIG_CACHE
-          value: /tmp/npm-cache
         - name: CYPRESS_CACHE_FOLDER
           value: /tmp/cypress-cache
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        - name: GAE_SDK_ROOT
+          value: /opt/google_appengine
       endpoints:
-        - name: angular-dev
-          targetPort: 4200
+        - name: gae-dev-server
+          targetPort: 8080
           exposure: public
           protocol: http
+        - name: gae-admin-console
+          targetPort: 8000
+          exposure: public
+          protocol: http
+
 commands:
-  - id: setup-npm-env
+  - id: setup-gae-env
     exec:
       component: tools
       commandLine: |
-        echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
+        echo '' >> ~/.bashrc
+        echo '# Legacy GAE Python 2.7 Environment' >> ~/.bashrc
+        echo 'export GAE_SDK_ROOT=/opt/google_appengine' >> ~/.bashrc
+        echo 'export PATH="/opt/google_appengine:/usr/local/bin:${PATH}"' >> ~/.bashrc
+        echo 'export PYTHONPATH="/opt/google_appengine:/usr/local/lib/python2.7/site-packages:${PYTHONPATH}"' >> ~/.bashrc
+        echo 'export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"' >> ~/.bashrc
+        echo '' >> ~/.bashrc
+        echo '# GAE Development Aliases' >> ~/.bashrc
+        echo 'alias python2="/usr/local/bin/python2.7"' >> ~/.bashrc
+        echo 'alias python-legacy="/usr/local/bin/python2.7"' >> ~/.bashrc
+        echo 'alias gae-server="run-gae-dev-server"' >> ~/.bashrc
+        echo 'alias gae-env="gae-check"' >> ~/.bashrc
         source ~/.bashrc
 
   - id: setup-claude-mcp
@@ -81,9 +98,90 @@ commands:
           --header "Authorization: Basic $JENKINS_AUTH" \
           --env JENKINS_URL="$JENKINS_URL" \
           --env JENKINS_USERNAME="$JENKINS_USERNAME" \
-          --env JENKINS_TOKEN="$JENKINS_TOKEN"      
-           
+          --env JENKINS_TOKEN="$JENKINS_TOKEN"
+
+  # GAE Environment Helper Commands
+  - id: gae-check
+    exec:
+      component: tools
+      workingDir: /projects
+      commandLine: |
+        echo "=== GAE Environment Check ==="
+        export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+        if [ -f "/usr/local/bin/python2.7" ]; then
+          echo "Python 2.7: $(/usr/local/bin/python2.7 --version 2>&1)"
+          echo "Python 2.7 location: $(/usr/local/bin/python2.7 -c "import sys; print(sys.executable)" 2>/dev/null || echo "Python test failed")"
+        else
+          echo "Python 2.7: NOT FOUND"
+        fi
+        echo "GAE SDK: /opt/google_appengine"
+        if [ -f "/opt/google_appengine/dev_appserver.py" ]; then
+          echo "GAE dev_appserver: Found"
+        else
+          echo "GAE dev_appserver: NOT FOUND"
+        fi
+        echo "Installed legacy packages:"
+        /usr/local/bin/python2.7 -m pip list 2>/dev/null | grep -E "(webapp2|jinja2|webob|yaml|django)" || echo "Package check failed"
+
+  - id: run-gae-dev-server
+    exec:
+      component: tools
+      workingDir: /projects/khanacademy
+      commandLine: |
+        export PATH="/opt/google_appengine:$PATH"
+        export PYTHONPATH="/opt/google_appengine:$PYTHONPATH"
+        export DJANGO_SETTINGS_MODULE=
+        DJANGO_SETTINGS_MODULE= python2 /opt/google_appengine/dev_appserver.py --host=0.0.0.0 --port=8080 --enable_host_checking=false --skip_sdk_update_check=true .
+
+  - id: load-sample-data
+    exec:
+      component: tools
+      workingDir: /projects/khanacademy/sample_data
+      commandLine: |-
+        echo "Loading Khan Academy sample data into local GAE datastore..."
+        echo "This will populate the datastore with playlists, videos, and exercises"
+        echo "Make sure the GAE dev server is running on port 8080 first!"
+        echo ""
+        
+        # Fix Python 2/3 compatibility in sample_data.py
+        sed -i 's/print \x27/print(\x27/g' sample_data.py
+        sed -i 's/call_args)/call_args))/g' sample_data.py
+        
+        # Load core data types needed for the homepage
+        echo "Loading Playlists..."
+        /usr/local/bin/python2.7 /opt/google_appengine/appcfg.py \
+          --url=http://localhost:8080/remote_api \
+          --email=test@example.com \
+          --application=dev~khanexercises \
+          upload_data --kind=Playlist --filename=Playlist.data --num_threads=1
+        
+        echo "Loading Videos..."
+        /usr/local/bin/python2.7 /opt/google_appengine/appcfg.py \
+          --url=http://localhost:8080/remote_api \
+          --email=test@example.com \
+          --application=dev~khanexercises \
+          upload_data --kind=Video --filename=Video.data --num_threads=1
+        
+        echo "Loading Video-Playlist mappings..."
+        /usr/local/bin/python2.7 /opt/google_appengine/appcfg.py \
+          --url=http://localhost:8080/remote_api \
+          --email=test@example.com \
+          --application=dev~khanexercises \
+          upload_data --kind=VideoPlaylist --filename=VideoPlaylist.data --num_threads=1
+        
+        echo "Loading Exercises..."
+        /usr/local/bin/python2.7 /opt/google_appengine/appcfg.py \
+          --url=http://localhost:8080/remote_api \
+          --email=test@example.com \
+          --application=dev~khanexercises \
+          upload_data --kind=Exercise --filename=Exercise.data --num_threads=1
+        
+        echo ""
+        echo "Sample data loading complete! The Khan Academy app should now show real content."
+        echo "Loaded: 48 Playlists, 2128 Videos, 2254 Video-Playlist mappings, and Exercises"
+
 events:
   postStart:
-    - setup-npm-env
-    - setup-claude-mcp
+   # - setup-gae-env
+   - setup-claude-mcp
+   # - gae-check

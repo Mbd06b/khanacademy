@@ -87,14 +87,14 @@ def main():
         else:
             parser.print_help()
             return
-        print ' '.join(call_args)
+        print(' '.join(call_args))))
 
         if options.email == parser.get_option('--email').default:
             process = subprocess.Popen(call_args, stdin=subprocess.PIPE)
             # Send a newline for the password prompt
             process.communicate("\n")
         else:
-            process = subprocess.Popen(call_args)
+            process = subprocess.Popen(call_args)))
         process.wait()
 
 if __name__ == '__main__':

@@ -8,7 +8,11 @@ from django.template.defaultfilters import timesince
 import util
 
 # get registry, we need it to register our filter later.
-register = webapp.template.create_template_register()
+try:
+    register = webapp.template.create_template_register()
+except:
+    # Fallback for Django compatibility
+    register = template.Library()
 
 def smart_truncate(content, length=100, suffix='...'):
     if len(content) <= length:
@@ -98,5 +102,3 @@ register.filter(multiply)
 register.filter(in_list)
 register.filter(find_column_index)
 register.filter(column_height)
-
-webapp.template.register_template_library('discussion.templatefilters')

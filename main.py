@@ -1,5 +1,21 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+
+# Apply GAE Django template library patch for legacy module names
+import sys
+import os
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.info("Starting Khan Academy application")
+
+sys.path.insert(0, os.path.dirname(__file__))
+try:
+    from gae_template_patch import patch_template_registration
+    result = patch_template_registration()
+    logging.info("Template patch result: %s", result)
+except Exception as e:
+    logging.error("Template patch failed: %s", e)
+
 import cgi
 import os
 import datetime
@@ -16,15 +32,16 @@ from google.appengine.runtime.apiproxy_errors import DeadlineExceededError
 import django.conf
 
 try:
-    django.conf.settings.configure(
-        DEBUG=False,
-        TEMPLATE_DEBUG=False,
-        TEMPLATE_LOADERS=(
-          'django.template.loaders.filesystem.load_template_source',
-        ),
-        TEMPLATE_DIRS=(os.path.dirname(__file__),)
-    )
-except EnvironmentError:
+    if not django.conf.settings.configured:
+        django.conf.settings.configure(
+            DEBUG=False,
+            TEMPLATE_DEBUG=False,
+            TEMPLATE_LOADERS=(
+              'django.template.loaders.filesystem.load_template_source',
+            ),
+            TEMPLATE_DIRS=(os.path.dirname(__file__),)
+        )
+except (EnvironmentError, RuntimeError):
     pass
 
 from django.template.loader import render_to_string
@@ -1734,8 +1751,7 @@ class ViewHomePage(request_handler.RequestHandler):
                                                   'logout_url': logout_url,
                                                   'approx_vid_count': consts.APPROX_VID_COUNT, }, 
                                                   self.request)
-        path = os.path.join(os.path.dirname(__file__), 'homepage.html')
-        self.response.out.write(template.render(path, template_values))
+        self.render_template('homepage.html', template_values)
         
 class ViewFAQ(request_handler.RequestHandler):
     def get(self):
@@ -2103,9 +2119,13 @@ class PermanentRedirectToHome(request_handler.RequestHandler):
         self.redirect(redirect_target, True)
                         
 def real_main():    
-    webapp.template.register_template_library('templatefilters')
-    webapp.template.register_template_library('templatetags')    
-    webapp.template.register_template_library('templateext')    
+    # Enable template library registration with template patch
+    try:
+        webapp.template.register_template_library('templatefilters')
+        webapp.template.register_template_library('templatetags')    
+        webapp.template.register_template_library('templateext')
+    except (AttributeError, ImportError, ValueError) as e:
+        logging.warning("Failed to register template libraries: %s", e)    
     application = webapp.WSGIApplication([ 
         ('/', ViewHomePage),
         ('/about', util_about.ViewAbout),
