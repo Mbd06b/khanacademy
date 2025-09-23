@@ -50,15 +50,41 @@ This is a preserved snapshot of Khan Academy's educational platform from 2010-20
 
 ## Development Environment
 
-The legacy runtime requirements are documented in the containerized development setup:
+The legacy runtime requirements are documented in a two-stage containerized development setup:
+
+### Container Build Process
+
+**Stage 1: Base Development Image (`udi-base.dockerfile`)**
+```dockerfile
+FROM quay.io/devfile/universal-developer-image:ubi9-latest
+```
+Installs modern development tools:
+- **Claude Code**: AI coding assistant (`@anthropic-ai/claude-code`)
+- **Java 21**: OpenJDK for modern tooling
+- **CLI Tools**: tree, htop, fzf, tmux for development productivity
+- **SonarQube MCP**: Code quality analysis integration
+
+**Stage 2: Legacy GAE Runtime (`udi-gae-legacy.dockerfile`)**
+```dockerfile
+FROM harbor.ethosengine.com/devspaces/udi-plus:latest
+```
+Builds the deprecated Python 2.7 + GAE environment:
 
 ### Runtime Requirements
-Based on `udi-base.dockerfile` and `udi-gae-legacy.dockerfile`:
-
-- **Python 2.7.18**: Compiled from source (no longer in modern repos)
+- **Python 2.7.18**: Compiled from source with shared libraries
+  - Source: `https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz`
+  - Build dependencies: gcc, openssl-devel, libffi-devel, zlib-devel
 - **Google App Engine SDK 1.9.91**: Last version supporting Python 2.7
-- **Legacy Python packages**: webapp2, Django 1.3.7, Jinja2 2.10.1
-- **Build dependencies**: gcc, openssl-devel, libffi-devel for Python compilation
+  - Source: `https://storage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.91.zip`
+- **Legacy Python packages** (exact versions for compatibility):
+  - webapp2==2.5.2, jinja2==2.10.1, webob==1.8.7
+  - django==1.3.7, pyyaml==3.13, requests==2.25.1
+  - Optional: lxml==4.2.6, pillow==6.2.2 (with fallbacks)
+
+### Container Build Commands
+Build your own development images using the provided dockerfiles based on Universal Developer Image (UDI) for Eclipse Che compatibility:
+- `udi-base.dockerfile` for the base image with modern tools
+- `udi-gae-legacy.dockerfile` for the legacy GAE runtime environment
 
 ### Setup Commands
 From `devfile.yaml`, the environment setup includes:
