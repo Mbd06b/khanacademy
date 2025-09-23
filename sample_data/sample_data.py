@@ -94,7 +94,7 @@ def main():
             # Send a newline for the password prompt
             process.communicate("\n")
         else:
-            process = subprocess.Popen(call_args)))
+            process = subprocess.Popen(call_args))
         process.wait()
 
 if __name__ == '__main__':
